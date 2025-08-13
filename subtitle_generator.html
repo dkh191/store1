@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片字幕生成器</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .control-group {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .control-group label {
+            min-width: 120px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100px;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 40px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .file-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .file-btn:hover {
+            background: #45a049;
+        }
+        .file-name {
+            padding: 8px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            min-width: 200px;
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            resize: vertical;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .button-group {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        .btn:hover {
+            background: #45a049;
+        }
+        .btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .preview {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .preview img {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+        }
+        .watermark {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        .wechat-info {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: white;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .wechat-icon {
+            width: 20px;
+            height: 20px;
+            background: #07C160;
+            border-radius: 50%;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>图片字幕生成器</h1>
+        
+        <div class="control-group">
+            <label>选择文件:</label>
+            <div class="file-selector">
+                <button class="file-btn" onclick="document.getElementById('fileInput').click()">选择文件</button>
+                <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+                <span class="file-name" id="fileName">未选择文件</span>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label>字幕高度(px):</label>
+            <input type="number" id="subtitleHeight" value="40" min="20" max="100">
+        </div>
+        
+        <div class="control-group">
+            <label>字体大小(px):</label>
+            <input type="number" id="fontSize" value="20" min="12" max="50">
+        </div>
+        
+        <div class="control-group">
+            <label>字体颜色:</label>
+            <input type="color" id="fontColor" value="#ffffff">
+        </div>
+        
+        <div class="control-group">
+            <label>轮廓颜色:</label>
+            <input type="color" id="outlineColor" value="#000000">
+        </div>
+        
+        <div class="control-group">
+            <label>字幕内容:</label>
+        </div>
+        <textarea id="subtitleText" placeholder="请输入字幕内容，每行一个字幕...">别吵
+我在给自己写钓鱼网站呢
+对,这年头
+咱们猫咪都能自己写代码了</textarea>
+        
+        <div class="button-group">
+            <button class="btn" id="generateBtn" onclick="generateSubtitle()">生成字幕图片</button>
+            <button class="btn" id="saveBtn" onclick="saveImage()" disabled>保存图片</button>
+        </div>
+        
+        <div class="preview" id="preview">
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let selectedImage = null;
+        let generatedCanvas = null;
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                document.getElementById('fileName').textContent = file.name;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    selectedImage = new Image();
+                    selectedImage.onload = function() {
+                        document.getElementById('generateBtn').disabled = false;
+                    };
+                    selectedImage.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function generateSubtitle() {
+            if (!selectedImage) {
+                alert('请先选择图片文件！');
+                return;
+            }
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 设置画布尺寸
+            canvas.width = selectedImage.width;
+            canvas.height = selectedImage.height;
+            
+            // 绘制背景图片
+            ctx.drawImage(selectedImage, 0, 0);
+            
+            // 添加水印
+            ctx.font = 'bold 16px Microsoft YaHei';
+            ctx.fillStyle = 'white';
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.fillText('南瓜博士', canvas.width - 100, 30);
+            
+            // 获取字幕设置
+            const subtitleHeight = parseInt(document.getElementById('subtitleHeight').value);
+            const fontSize = parseInt(document.getElementById('fontSize').value);
+            const fontColor = document.getElementById('fontColor').value;
+            const outlineColor = document.getElementById('outlineColor').value;
+            const subtitleText = document.getElementById('subtitleText').value;
+            
+            // 分割字幕行
+            const lines = subtitleText.split('\n').filter(line => line.trim());
+            
+            if (lines.length === 0) {
+                alert('请输入字幕内容！');
+                return;
+            }
+            
+            // 计算字幕区域
+            const subtitleAreaHeight = lines.length * subtitleHeight;
+            const startY = canvas.height - subtitleAreaHeight - 20;
+            
+            // 绘制半透明背景
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(0, startY, canvas.width, subtitleAreaHeight);
+            
+            // 绘制字幕
+            ctx.font = `bold ${fontSize}px Microsoft YaHei`;
+            ctx.textAlign = 'center';
+            
+            lines.forEach((line, index) => {
+                const y = startY + (index + 1) * subtitleHeight - 10;
+                const x = canvas.width / 2;
+                
+                // 绘制轮廓
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = 3;
+                ctx.strokeText(line, x, y);
+                
+                // 绘制文字
+                ctx.fillStyle = fontColor;
+                ctx.fillText(line, x, y);
+            });
+            
+            // 添加微信信息
+            ctx.font = '14px Microsoft YaHei';
+            ctx.textAlign = 'right';
+            ctx.fillStyle = 'white';
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            
+            // 绘制微信图标背景
+            ctx.fillStyle = '#07C160';
+            ctx.beginPath();
+            ctx.arc(canvas.width - 30, canvas.height - 20, 10, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // 绘制微信文字
+            ctx.fillStyle = 'white';
+            ctx.fillText('公众号・南瓜博士', canvas.width - 50, canvas.height - 15);
+            
+            // 显示画布
+            canvas.style.display = 'block';
+            generatedCanvas = canvas;
+            document.getElementById('saveBtn').disabled = false;
+            
+            // 清空预览区域并显示结果
+            const preview = document.getElementById('preview');
+            preview.innerHTML = '';
+            preview.appendChild(canvas);
+        }
+
+        function saveImage() {
+            if (!generatedCanvas) {
+                alert('请先生成字幕图片！');
+                return;
+            }
+            
+            const link = document.createElement('a');
+            link.download = 'subtitle_image.png';
+            link.href = generatedCanvas.toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html>
